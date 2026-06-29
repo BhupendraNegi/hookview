@@ -1,0 +1,48 @@
+# Local dev & self-host stack. Run with Colima on macOS:
+#   colima start           # provides the Docker daemon
+#   docker compose up --build
+#   open http://localhost:3000
+#
+# `srh` (serverless-redis-http) exposes the Upstash REST API on top of a plain
+# Redis container, so the same @upstash/redis client used on Vercel works here
+# unchanged — only the env vars differ.
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  srh:
+    image: hiett/serverless-redis-http:latest
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: hookview_dev_token
+      SRH_CONNECTION_STRING: "redis://redis:6379"
+    ports:
+      # Host:8079 -> SRH:80, so a local `npm run dev` can reach it too.
+      - "8079:80"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      UPSTASH_REDIS_REST_URL: "http://srh:80"
+      UPSTASH_REDIS_REST_TOKEN: "hookview_dev_token"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - srh
+
+volumes:
+  redis-data:
