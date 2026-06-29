@@ -8,21 +8,26 @@ Shopify, …), and watch requests land live in a dashboard where you can inspect
 the method, headers, query params, and a pretty-printed JSON body.
 
 - **No accounts, nothing to install.**
-- Captures **auto-expire after 24h** and the list is capped at the **last 100**
+- Captures **auto-expire after 24h**; the list is capped at the **last 100**
   requests per inbox.
 - The catcher accepts **any** HTTP method, content-type, and body — it never
   rejects anything and always returns `200`.
 
-## Stack
+**Stack:** Next.js (App Router, TypeScript) · Upstash Redis (`@upstash/redis`) ·
+Tailwind CSS · 2s polling. One codebase runs on local Docker, self-hosted Docker,
+and Vercel — only the two env vars differ.
 
-- **Next.js** (App Router, TypeScript)
-- **Upstash Redis** (`@upstash/redis`) for storage — REST-based, so it works in
-  Vercel's stateless functions. Data model maps onto `LPUSH` / `LTRIM` / `EXPIRE`.
-- **Tailwind CSS** for styling
-- **Polling** (the dashboard refetches every 2s) — no websockets needed
+## Quick start (local)
 
-One codebase runs in three places (local Docker, self-hosted Docker, Vercel);
-only the two env vars differ.
+```bash
+bin/setup     # one-time: Colima profile, deps, .env.local, Redis + SRH
+bin/dev       # start the dev server; Ctrl-C tears down server + containers
+```
+
+Then open the printed URL (defaults to http://localhost:3000; `bin/dev`
+auto-bumps to the next free port if 3000 is taken). No cloud account needed —
+local storage runs in Docker. See [docs/development.md](docs/development.md) for
+the by-hand steps, the dedicated Colima profile, and self-hosting.
 
 ## Environment variables
 
@@ -33,140 +38,26 @@ only the two env vars differ.
 
 See [`.env.example`](.env.example) for both the Docker and Vercel value sets.
 
----
-
-## Local development — Colima + Docker (no cloud account needed)
-
-`@upstash/redis` only speaks Upstash's REST protocol, so locally we run
-[`serverless-redis-http` (SRH)](https://github.com/hiett/serverless-redis-http) —
-a tiny proxy that exposes that REST API on top of a plain Redis container. The
-app code is identical to production.
-
-### Quickest path — `bin/setup` + `bin/dev`
-
-```bash
-bin/setup     # one-time: starts Colima, installs deps, creates .env.local,
-              #           brings up Redis + SRH
-bin/dev       # starts the dev server; tears the containers down on Ctrl-C
-```
-
-`bin/dev` defaults to port 3000 and auto-bumps to the next free port if it's
-taken (`PORT=3939 bin/dev` or `bin/dev 3939` to choose one). Everything below is
-what those scripts do under the hood, if you'd rather run it by hand.
-
-> **Dedicated Colima instance.** The scripts run in their own Colima profile
-> named **`webhook`** (Docker context `colima-webhook`) so they never start or
-> touch your default Colima. The commands below pin docker to it the same way —
-> `export DOCKER_CONTEXT=colima-webhook`. To fully stop the instance later:
-> `colima stop -p webhook`.
-
-### Option A — everything in Docker
-
-```bash
-colima start -p webhook              # dedicated Docker daemon
-export DOCKER_CONTEXT=colima-webhook # pin docker/compose to it
-docker compose up --build            # starts redis + srh + the app
-open http://localhost:3000
-```
-
-### Option B — app on the host, Redis in Docker
-
-Run just the backing services in containers and the Next.js dev server natively
-(faster hot reload):
-
-```bash
-colima start -p webhook
-export DOCKER_CONTEXT=colima-webhook
-docker compose up -d redis srh   # SRH is published on localhost:8079
-cp .env.example .env.local        # already points at http://localhost:8079
-npm install
-npm run dev
-open http://localhost:3000
-```
-
-> Port 3000 already taken? Run `PORT=3939 npm run dev`.
-
-### Inspecting Redis directly
-
-```bash
-# (DOCKER_CONTEXT=colima-webhook must be set, as above)
-docker compose exec redis redis-cli KEYS 'inbox:*'
-docker compose exec redis redis-cli TTL inbox:<id>     # ~86400
-docker compose exec redis redis-cli LLEN inbox:<id>    # ≤ 100
-```
-
----
-
 ## Deploy to Vercel
 
 1. **Create an Upstash Redis database** at
    [console.upstash.com](https://console.upstash.com) and copy its **REST URL**
    and **REST token**.
 2. Import this repo into Vercel.
-3. Add the two env vars in **Project → Settings → Environment Variables**:
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
+3. Add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` under
+   **Project → Settings → Environment Variables**.
 4. Deploy. Your catcher URLs will be `https://<your-app>.vercel.app/hook/<id>`.
 
 No Docker is involved on Vercel — it uses the real Upstash database directly.
 
----
+## Documentation
 
-## Self-host with Docker
-
-The same `docker-compose.yml` is a complete self-hosted stack (app + Redis +
-SRH). Point a reverse proxy / domain at the `app` service on port 3000. For a
-managed datastore instead, drop the `redis`/`srh` services and set the two
-`UPSTASH_REDIS_REST_*` vars on the `app` service to a real Upstash DB.
-
----
-
-## How it works
-
-| Route | Purpose |
+| Doc | What's in it |
 |---|---|
-| `POST /api/inbox/create` | Mint a new inbox id (`in_xxxxxxxx`) |
-| `ALL /hook/[...slug]` | **The catcher.** `slug[0]` is the inbox id; any extra path is captured too. Reads the raw body first, stores everything, always returns `200` |
-| `GET /api/inbox/[id]/requests` | Captured requests for the dashboard to poll |
-| `DELETE /api/inbox/[id]/requests` | Clear all captured requests |
-
-Each captured request is stored in the Redis list `inbox:{id}` as JSON:
-
-```jsonc
-{
-  "id": "req_…",
-  "method": "POST",
-  "path": "/hook/in_4f9c2a",
-  "query": { },
-  "headers": { },
-  "body": "…raw body, verbatim…",
-  "contentType": "application/json",
-  "timestamp": 1719660421000,
-  "source": "Stripe",   // derived from signature headers / User-Agent (UI only)
-  "preview": "charge.succeeded"  // derived from body type/event (UI only)
-}
-```
-
-## Try it locally
-
-```bash
-# create an inbox
-ID=$(curl -s -X POST http://localhost:3000/api/inbox/create | sed -E 's/.*"id":"([^"]+)".*/\1/')
-
-# fire a webhook at it (open http://localhost:3000/inbox/$ID to watch it land)
-curl -X POST "http://localhost:3000/hook/$ID" \
-  -H 'Content-Type: application/json' \
-  -d '{"type":"charge.succeeded","amount":4900,"currency":"usd"}'
-```
-
-## Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build (standalone output for Docker) |
-| `npm start` | Run the production build |
-| `npm run lint` | Lint |
+| [docs/architecture.md](docs/architecture.md) | Stack, request lifecycle, data model, routes, file layout, key decisions |
+| [docs/design.md](docs/design.md) | Product intent, screens, and the design system (tokens, type, motion) |
+| [docs/development.md](docs/development.md) | Running locally by hand, the Colima profile, scripts, CI, self-hosting |
+| [docs/debugging.md](docs/debugging.md) | Newcomer's guide: where logs go and how to inspect the Redis data |
 
 ## Out of scope (v1)
 
