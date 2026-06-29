@@ -8,6 +8,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# ── dedicated Colima instance ────────────────────────────────────────────────
+# Run in our own "webhook" profile so we never start or touch the default
+# Colima. DOCKER_CONTEXT pins docker/compose to this instance for the duration
+# of the script without changing your globally-active context.
+COLIMA_PROFILE="webhook"
+export DOCKER_CONTEXT="colima-${COLIMA_PROFILE}"
+
 # ── pretty output ────────────────────────────────────────────────────────────
 bold() { printf "\033[1m%s\033[0m\n" "$1"; }
 info() { printf "\033[34m▸\033[0m %s\n" "$1"; }
@@ -24,12 +31,12 @@ command -v npm    >/dev/null 2>&1 || die "npm not found. Install Node.js (e.g. v
 ok "Prerequisites present (docker, colima, npm)"
 
 # ── Colima (Docker daemon) ───────────────────────────────────────────────────
-if colima status >/dev/null 2>&1; then
-  ok "Colima already running"
+if colima status -p "$COLIMA_PROFILE" >/dev/null 2>&1; then
+  ok "Colima profile '$COLIMA_PROFILE' already running"
 else
-  info "Starting Colima…"
-  colima start
-  ok "Colima started"
+  info "Starting Colima profile '$COLIMA_PROFILE'…"
+  colima start -p "$COLIMA_PROFILE"
+  ok "Colima profile '$COLIMA_PROFILE' started"
 fi
 
 # ── env file ─────────────────────────────────────────────────────────────────

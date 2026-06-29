@@ -54,11 +54,18 @@ bin/dev       # starts the dev server; tears the containers down on Ctrl-C
 taken (`PORT=3939 bin/dev` or `bin/dev 3939` to choose one). Everything below is
 what those scripts do under the hood, if you'd rather run it by hand.
 
+> **Dedicated Colima instance.** The scripts run in their own Colima profile
+> named **`webhook`** (Docker context `colima-webhook`) so they never start or
+> touch your default Colima. The commands below pin docker to it the same way —
+> `export DOCKER_CONTEXT=colima-webhook`. To fully stop the instance later:
+> `colima stop -p webhook`.
+
 ### Option A — everything in Docker
 
 ```bash
-colima start                 # provides the Docker daemon on macOS
-docker compose up --build    # starts redis + srh + the app
+colima start -p webhook              # dedicated Docker daemon
+export DOCKER_CONTEXT=colima-webhook # pin docker/compose to it
+docker compose up --build            # starts redis + srh + the app
 open http://localhost:3000
 ```
 
@@ -68,7 +75,8 @@ Run just the backing services in containers and the Next.js dev server natively
 (faster hot reload):
 
 ```bash
-colima start
+colima start -p webhook
+export DOCKER_CONTEXT=colima-webhook
 docker compose up -d redis srh   # SRH is published on localhost:8079
 cp .env.example .env.local        # already points at http://localhost:8079
 npm install
@@ -81,6 +89,7 @@ open http://localhost:3000
 ### Inspecting Redis directly
 
 ```bash
+# (DOCKER_CONTEXT=colima-webhook must be set, as above)
 docker compose exec redis redis-cli KEYS 'inbox:*'
 docker compose exec redis redis-cli TTL inbox:<id>     # ~86400
 docker compose exec redis redis-cli LLEN inbox:<id>    # ≤ 100
