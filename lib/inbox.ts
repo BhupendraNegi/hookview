@@ -1,5 +1,5 @@
 import { customAlphabet } from "nanoid";
-import { redis } from "./redis";
+import { getRedis } from "./redis";
 import type { CapturedRequest } from "./types";
 
 const MAX_REQUESTS = 100; // cap list length to stay within the free tier
@@ -32,6 +32,7 @@ export async function captureRequest(
 ): Promise<CapturedRequest> {
   const record: CapturedRequest = { id: newRequestId(), ...data };
   const k = key(inboxId);
+  const redis = getRedis();
 
   await redis.lpush(k, JSON.stringify(record));
   await redis.ltrim(k, 0, MAX_REQUESTS - 1);
@@ -42,7 +43,7 @@ export async function captureRequest(
 
 /** Fetch captured requests for an inbox, newest first. */
 export async function getRequests(inboxId: string): Promise<CapturedRequest[]> {
-  const raw = await redis.lrange<string | CapturedRequest>(key(inboxId), 0, -1);
+  const raw = await getRedis().lrange<string | CapturedRequest>(key(inboxId), 0, -1);
   return raw
     .map((entry) => {
       // @upstash/redis may hand back either the raw string or a pre-parsed
@@ -61,7 +62,7 @@ export async function getRequests(inboxId: string): Promise<CapturedRequest[]> {
 
 /** Clear every captured request for an inbox ("Clear all"). */
 export async function clearRequests(inboxId: string): Promise<void> {
-  await redis.del(key(inboxId));
+  await getRedis().del(key(inboxId));
 }
 
 /**
