@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# bin/lint — static checks: ESLint + TypeScript. No Docker/daemon needed.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+info() { printf "\033[34m▸\033[0m %s\n" "$1"; }
+ok()   { printf "\033[32m✓\033[0m %s\n" "$1"; }
+
+info "Linting (eslint)…"
+npm run lint
+
+info "Type-checking (tsc)…"
+npx tsc --noEmit
+
+ok "Lint + typecheck passed"
