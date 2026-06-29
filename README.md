@@ -42,6 +42,18 @@ See [`.env.example`](.env.example) for both the Docker and Vercel value sets.
 a tiny proxy that exposes that REST API on top of a plain Redis container. The
 app code is identical to production.
 
+### Quickest path — `bin/setup` + `bin/dev`
+
+```bash
+bin/setup     # one-time: starts Colima, installs deps, creates .env.local,
+              #           brings up Redis + SRH
+bin/dev       # starts the dev server; tears the containers down on Ctrl-C
+```
+
+`bin/dev` defaults to port 3000 and auto-bumps to the next free port if it's
+taken (`PORT=3939 bin/dev` or `bin/dev 3939` to choose one). Everything below is
+what those scripts do under the hood, if you'd rather run it by hand.
+
 ### Option A — everything in Docker
 
 ```bash

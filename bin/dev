@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# bin/dev — start the HookView dev server with its backing services.
+#
+# Ensures Colima + Redis + SRH are up, then runs `next dev`.
+# When you stop it (Ctrl-C / exit), it tears the server and containers down.
+#
+# Port: defaults to 3000, override with `PORT=3939 bin/dev` or `bin/dev 3939`.
+# If the chosen port is busy, the next free port is used automatically.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+info() { printf "\033[34m▸\033[0m %s\n" "$1"; }
+ok()   { printf "\033[32m✓\033[0m %s\n" "$1"; }
+warn() { printf "\033[33m!\033[0m %s\n" "$1"; }
+die()  { printf "\033[31m✗ %s\033[0m\n" "$1" >&2; exit 1; }
+
+# ── tear everything down on exit ─────────────────────────────────────────────
+DEV_PID=""
+CLEANED=""
+cleanup() {
+  [ -n "$CLEANED" ] && return; CLEANED=1
+  echo
+  info "Stopping dev server…"
+  if [ -n "$DEV_PID" ]; then
+    pkill -P "$DEV_PID" 2>/dev/null || true   # next dev worker children
+    kill "$DEV_PID" 2>/dev/null || true       # the npm process
+  fi
+  info "Stopping containers…"
+  docker compose down >/dev/null 2>&1 || true
+  ok "Everything stopped. Bye 👋"
+}
+trap cleanup EXIT INT TERM
+
+# ── prerequisites / daemon ───────────────────────────────────────────────────
+command -v colima >/dev/null 2>&1 || die "Colima not found. Run bin/setup first."
+if ! colima status >/dev/null 2>&1; then
+  info "Starting Colima…"
+  colima start
+fi
+
+# ── env file (so a standalone `bin/dev` still works) ─────────────────────────
+[ -f .env.local ] || cp .env.example .env.local
+
+# ── backing services ─────────────────────────────────────────────────────────
+info "Starting Redis + SRH…"
+docker compose up -d redis srh
+
+TOKEN="$(grep -E '^UPSTASH_REDIS_REST_TOKEN=' .env.local | cut -d= -f2-)"
+info "Waiting for SRH…"
+for i in $(seq 1 30); do
+  curl -fsS -X POST http://localhost:8079 \
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    -d '["PING"]' 2>/dev/null | grep -q PONG && { ok "SRH ready"; break; }
+  [ "$i" -eq 30 ] && die "SRH did not become ready. Check 'docker compose logs srh'."
+  sleep 1
+done
+
+# ── pick a free port ─────────────────────────────────────────────────────────
+PORT="${1:-${PORT:-3000}}"
+port_busy() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+if port_busy "$PORT"; then
+  warn "Port $PORT is in use; searching for a free one…"
+  for p in $(seq "$PORT" $((PORT + 20))); do
+    port_busy "$p" || { PORT="$p"; break; }
+  done
+fi
+
+echo
+ok "Starting Next.js on http://localhost:${PORT}"
+info "Press Ctrl-C to stop (server + containers will be torn down)."
+echo
+
+# Run in the background and `wait`, so a Ctrl-C / TERM interrupts the wait and
+# runs the cleanup trap (a foreground command would defer the trap until it
+# exits, leaving containers running).
+PORT="$PORT" npm run dev &
+DEV_PID=$!
+wait "$DEV_PID" || true
