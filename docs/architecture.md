@@ -40,9 +40,11 @@ Only the two `UPSTASH_REDIS_REST_*` env vars change between them; there is no
 
 ## Request lifecycle
 
-1. **Create** — Landing page button → `POST /api/inbox/create` returns a new
-   `in_xxxxxxxx` id → the browser routes to `/inbox/{id}`. (No Redis write yet;
-   the key is created lazily on the first captured request.)
+1. **Create / resume** — Landing page button → if this browser already has a
+   remembered inbox id (`localStorage`), it routes straight to `/inbox/{id}`;
+   otherwise `POST /api/inbox/create` returns a new `in_xxxxxxxx` id, which is
+   remembered, and the browser routes to `/inbox/{id}`. (No Redis write at
+   create time; the key is created lazily on the first captured request.)
 2. **Capture** — An external service sends *any* HTTP request to `/hook/{id}`.
    The catcher reads the **raw body first**, collects headers + query, derives a
    friendly `source`/`preview`, stores everything, and returns `200`.

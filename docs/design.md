@@ -35,7 +35,8 @@ action: *Create my free inbox*.
   flow diagram of a single webhook's journey, then a secondary CTA.
 
 The CTA ([components/CreateInboxButton.tsx](../components/CreateInboxButton.tsx))
-creates an inbox and routes to its dashboard.
+opens this browser's inbox, creating and remembering one (in `localStorage`) on
+first use so repeat clicks resume the same inbox rather than minting a new one.
 
 ### 2. Dashboard — [app/inbox/[id]/page.tsx](../app/inbox/%5Bid%5D/page.tsx)
 The working screen. A fixed top bar over a split body.
