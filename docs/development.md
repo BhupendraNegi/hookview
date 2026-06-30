@@ -60,6 +60,7 @@ open http://localhost:3000
 | `bin/setup` | One-time: Colima profile, deps, `.env.local`, Redis + SRH |
 | `bin/dev` | Start the dev server; tears down server + containers on exit |
 | `bin/lint` | ESLint + `tsc --noEmit` (also run in CI) |
+| `npm test` | Run the Vitest suite (also run in CI) |
 | `npm run dev` | Start the dev server (without the container/teardown wrapper) |
 | `npm run build` | Production build (standalone output for Docker) |
 | `npm start` | Run the production build |
@@ -83,10 +84,27 @@ inspect the stored data.
 ## Continuous integration
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs on every push to
-`main` and every PR: `npm ci` → `bin/lint` → `npm run build` on Node 22. No
-Docker or Redis is needed in CI (the build doesn't require env vars — the Redis
-client is constructed lazily; see
+`main` and every PR: `npm ci` → `bin/lint` → `npm test` → `npm run build` on
+Node 22. No Docker or Redis is needed in CI (the tests mock the Redis-touching
+helpers, and the build doesn't require env vars — the Redis client is
+constructed lazily; see
 [architecture.md](./architecture.md#key-implementation-decisions)).
+
+## Tests
+
+[Vitest](https://vitest.dev) unit tests live in [tests/](../tests). They cover
+the highest-value logic without a live Redis or a browser:
+
+- `tests/lib.test.ts` — the pure helpers: method colors, relative/exact time,
+  JSON highlighting + HTML-escaping, inbox-id format, and the
+  `deriveSource`/`derivePreview` heuristics.
+- `tests/routes.test.ts` — the Route Handlers. The Redis-touching helpers
+  (`captureRequest`/`getRequests`/`clearRequests`) are mocked so the tests
+  exercise the routes' own logic — especially the **catcher contract**: any
+  method, raw body stored verbatim, malformed bodies never rejected, and an
+  always-`200` response even when storage throws.
+
+Run them with `npm test` (or `npx vitest` to watch).
 
 ## Self-host with Docker
 

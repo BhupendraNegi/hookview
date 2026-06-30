@@ -91,9 +91,14 @@ bin/dev       # daily: starts the dev server; Ctrl-C tears down server + contain
 ### Verify changes
 
 ```bash
+bin/lint             # ESLint + tsc
+npm test             # Vitest suite (tests/) — mocks Redis, no services needed
 npm run build        # must pass (typecheck + lint) — Vercel readiness gate
 docker compose build # the standalone image must build (set DOCKER_CONTEXT=colima-webhook)
 ```
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `bin/lint` →
+`npm test` → `npm run build` on every push/PR.
 
 Catcher smoke test (with the dev server running on $PORT):
 ```bash
