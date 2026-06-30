@@ -35,8 +35,11 @@ action: *Create my free inbox*.
   flow diagram of a single webhook's journey, then a secondary CTA.
 
 The CTA ([components/CreateInboxButton.tsx](../components/CreateInboxButton.tsx))
-opens this browser's inbox, creating and remembering one (in `localStorage`) on
-first use so repeat clicks resume the same inbox rather than minting a new one.
+creates an inbox on first use and remembers it (in `localStorage`). On a return
+visit it offers to **resume** that inbox, with an explicit secondary option to
+**create a new one** — so you don't lose a URL you've already wired into a
+service. Only inboxes created via this button are remembered (opening a shared
+`/inbox/{id}` link never overwrites it).
 
 ### 2. Dashboard — [app/inbox/[id]/page.tsx](../app/inbox/%5Bid%5D/page.tsx)
 The working screen. A fixed top bar over a split body.
