@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { CapturedRequest } from "@/lib/types";
+import { startVisiblePolling } from "@/lib/polling";
 import { LayersIcon, TrashIcon } from "@/components/icons";
 import { LiveDot } from "@/components/LiveDot";
 import { CopyButton } from "@/components/CopyButton";
@@ -54,11 +55,8 @@ export default function InboxDashboard() {
     }
   }, [id]);
 
-  useEffect(() => {
-    refetch();
-    const t = setInterval(refetch, POLL_MS);
-    return () => clearInterval(t);
-  }, [refetch]);
+  // Poll while visible; paused in hidden/background tabs.
+  useEffect(() => startVisiblePolling(refetch, POLL_MS), [refetch]);
 
   // Keep a valid selection.
   const selected = useMemo(() => {

@@ -118,12 +118,15 @@ Vercel project, push. No Docker on Vercel.
 - **The catcher** ([app/hook/[...slug]/route.ts](app/hook/%5B...slug%5D/route.ts)) is the
   critical/fiddly part. It accepts **any** method/content-type/body, reads the **raw body
   first**, never validates or rejects, and **always returns 200**. Catch-all so subpaths are
-  captured too. Don't add validation here.
+  captured too. Don't add validation here. One deliberate exception: ids that don't match
+  the minted shape (`isInboxId`) still get a 200 but are not stored, so scanners can't
+  create junk Redis keys.
 - **Redis client is lazy** ([lib/redis.ts](lib/redis.ts)) — built on first use, not at module
   load, so `next build` doesn't require env vars at build time. Keep it that way.
 - **`source`/`preview`** are derived at capture time (UI-only) in
   [lib/inbox.ts](lib/inbox.ts); everything else is wire data stored verbatim.
-- Storage: `LPUSH` → `LTRIM 0 99` (cap 100) → `EXPIRE 86400` (24h) on key `inbox:{id}`.
+- Storage: `LPUSH` → `LTRIM 0 99` (cap 100) → `EXPIRE 86400` (24h) on key `inbox:{id}`,
+  sent as one pipeline round trip.
 - Design tokens live in [tailwind.config.ts](tailwind.config.ts) — reference semantic names,
   don't scatter raw hex.
 

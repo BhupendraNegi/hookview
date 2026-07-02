@@ -68,6 +68,8 @@ LTRIM  inbox:{id}  0 99       # keep only the latest 100
 EXPIRE inbox:{id}  86400      # refresh the 24h TTL on every hit
 ```
 
+All three are sent as a single pipeline — one REST round trip per capture.
+
 Stored shape ([lib/types.ts](../lib/types.ts) → `CapturedRequest`):
 
 ```jsonc
@@ -110,7 +112,10 @@ list view, not wire data. Everything else is stored exactly as received.
 - be a catch-all (`[...slug]`) so `/hook/{id}/some/subpath` is captured too.
 
 It is wrapped in a `try/catch` that still returns `200` even on an internal
-failure. **Do not add validation here.**
+failure. **Do not add validation here** — with one deliberate exception: if
+`slug[0]` doesn't match the minted id shape (`in_` + 8 lowercase alphanumerics,
+`isInboxId`), the request still gets a `200` but is **not stored**, so bot
+scanners and typo'd URLs can't create junk Redis keys.
 
 ## File layout
 

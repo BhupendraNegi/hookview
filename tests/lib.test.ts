@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { methodColors } from "@/lib/method";
 import { rel, exact } from "@/lib/time";
 import { highlightJson, renderBody } from "@/lib/highlight";
-import { newInboxId, deriveSource, derivePreview } from "@/lib/inbox";
+import { newInboxId, isInboxId, deriveSource, derivePreview } from "@/lib/inbox";
 
 describe("methodColors", () => {
   it("returns the exact tint for known methods", () => {
@@ -73,6 +73,18 @@ describe("newInboxId", () => {
 
   it("is unique across calls", () => {
     expect(newInboxId()).not.toBe(newInboxId());
+  });
+});
+
+describe("isInboxId", () => {
+  it("accepts every id newInboxId mints", () => {
+    for (let i = 0; i < 20; i++) expect(isInboxId(newInboxId())).toBe(true);
+  });
+
+  it("rejects scanner paths, wrong lengths and wrong case", () => {
+    for (const junk of ["wp-login.php", "", "in_", "in_short", "in_toolong123", "in_ABC12345", "xx_abc12345"]) {
+      expect(isInboxId(junk)).toBe(false);
+    }
   });
 });
 

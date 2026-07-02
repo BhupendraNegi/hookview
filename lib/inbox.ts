@@ -12,6 +12,14 @@ export function newInboxId(): string {
   return `in_${nano()}`;
 }
 
+/**
+ * True if `id` has the exact shape `newInboxId` mints. The catcher uses this
+ * to skip storage for scanner/typo paths so junk can't create Redis keys.
+ */
+export function isInboxId(id: string): boolean {
+  return /^in_[0-9a-z]{8}$/.test(id);
+}
+
 /** A captured request id (distinct from the inbox id). */
 function newRequestId(): string {
   return `req_${nano()}${nano()}`;
@@ -32,11 +40,14 @@ export async function captureRequest(
 ): Promise<CapturedRequest> {
   const record: CapturedRequest = { id: newRequestId(), ...data };
   const k = key(inboxId);
-  const redis = getRedis();
 
-  await redis.lpush(k, JSON.stringify(record));
-  await redis.ltrim(k, 0, MAX_REQUESTS - 1);
-  await redis.expire(k, TTL_SECONDS);
+  // One pipelined round trip instead of three sequential REST calls.
+  await getRedis()
+    .pipeline()
+    .lpush(k, JSON.stringify(record))
+    .ltrim(k, 0, MAX_REQUESTS - 1)
+    .expire(k, TTL_SECONDS)
+    .exec();
 
   return record;
 }

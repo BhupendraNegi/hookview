@@ -3,6 +3,7 @@ import {
   captureRequest,
   deriveSource,
   derivePreview,
+  isInboxId,
 } from "@/lib/inbox";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +29,10 @@ async function handle(
   try {
     const { slug } = await ctx.params;
     const inboxId = slug?.[0];
-    if (!inboxId) {
-      return NextResponse.json({ ok: false, error: "missing inbox id" }, { status: 404 });
+    // Scanner/typo paths still get 200 (never reject), but nothing is stored,
+    // so junk URLs can't create Redis keys.
+    if (!inboxId || !isInboxId(inboxId)) {
+      return NextResponse.json({ ok: true, received: false });
     }
 
     // 1) Read the RAW body BEFORE any parsing. Empty body => null.
@@ -37,9 +40,13 @@ async function handle(
     if (request.method !== "GET" && request.method !== "HEAD") {
       const raw = await request.text();
       if (raw.length > 0) {
+        const bytes = Buffer.from(raw, "utf8");
         body =
-          raw.length > MAX_BODY_BYTES
-            ? raw.slice(0, MAX_BODY_BYTES) + "\n…[truncated by HookView]"
+          bytes.length > MAX_BODY_BYTES
+            ? // Cut on a byte boundary; strip any replacement char left by a
+              // multi-byte sequence split at the cut point.
+              bytes.toString("utf8", 0, MAX_BODY_BYTES).replace(/�+$/, "") +
+              "\n…[truncated by HookView]"
             : raw;
       }
     }
