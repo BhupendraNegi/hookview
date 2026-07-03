@@ -59,12 +59,6 @@ No Docker is involved on Vercel — it uses the real Upstash database directly.
 | [docs/development.md](docs/development.md) | Running locally by hand, the Colima profile, scripts, CI, self-hosting |
 | [docs/debugging.md](docs/debugging.md) | Newcomer's guide: where logs go and how to inspect the Redis data |
 
-## Out of scope (v1)
-
-User accounts, auth, webhook replay, custom response codes/bodies,
-search/filter, multiple saved inboxes per user.
-
-
 # Live 
 
 https://hookview.vercel.app/
