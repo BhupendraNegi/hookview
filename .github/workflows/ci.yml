@@ -29,8 +29,9 @@ jobs:
         run: npm run build
 
   # Production deploy: only on pushes to main, and only after `check` is green.
-  # Vercel's own Git auto-deploy of main is disabled in vercel.json, so this
-  # job is the sole path to production.
+  # Vercel's own Git integration is disabled entirely in vercel.json — no
+  # auto-deploy of main, no per-PR previews — so this job is the sole path to
+  # production. PRs get `check` only.
   deploy:
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
