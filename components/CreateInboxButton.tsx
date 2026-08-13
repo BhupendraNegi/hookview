@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { PrimaryButton } from "./PrimaryButton";
 import { ArrowRightIcon } from "./icons";
@@ -10,6 +10,10 @@ import { ArrowRightIcon } from "./icons";
 // created via this button — visiting a shared /inbox/{id} link never overwrites it.
 const STORAGE_KEY = "hookview:inbox-id";
 
+// The remembered id is only read once on mount, so there is nothing to
+// subscribe to.
+const noSubscribe = () => () => {};
+
 /**
  * Landing CTA. With no remembered inbox it creates one; once you have one it
  * offers to resume it, with an explicit option to start a new inbox instead.
@@ -17,13 +21,14 @@ const STORAGE_KEY = "hookview:inbox-id";
 export function CreateInboxButton({ label }: { label: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  // Read after mount only — localStorage isn't available during SSR, and this
-  // keeps the first client render matching the server (no hydration mismatch).
-  const [remembered, setRemembered] = useState<string | null>(null);
-
-  useEffect(() => {
-    setRemembered(localStorage.getItem(STORAGE_KEY));
-  }, []);
+  // Read after mount only — localStorage isn't available during SSR, and the
+  // null server snapshot keeps the first client render matching the server
+  // (no hydration mismatch).
+  const remembered = useSyncExternalStore(
+    noSubscribe,
+    () => localStorage.getItem(STORAGE_KEY),
+    () => null,
+  );
 
   function resume() {
     if (remembered) router.push(`/inbox/${remembered}`);
