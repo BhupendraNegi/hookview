@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
@@ -23,7 +23,7 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.5.2",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^15.5.20",
+    "eslint-config-next": "^16.3.0",
     "postcss": "^8.5.18",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",

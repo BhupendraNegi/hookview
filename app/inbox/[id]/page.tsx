@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { CapturedRequest } from "@/lib/types";
@@ -15,6 +22,10 @@ import { EmptyState } from "@/components/EmptyState";
 const POLL_MS = 2000;
 const NARROW = 880;
 
+// window.location.origin never changes for the life of the page, so there is
+// nothing to subscribe to.
+const noSubscribe = () => () => {};
+
 export default function InboxDashboard() {
   const { id } = useParams<{ id: string }>();
 
@@ -23,12 +34,16 @@ export default function InboxDashboard() {
   const [mobileDetail, setMobileDetail] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const [, setTick] = useState(0); // drives relative-time refresh
-  const [catchUrl, setCatchUrl] = useState("");
 
-  // Catch URL is the real deployment origin so it works out of the box.
-  useEffect(() => {
-    setCatchUrl(`${window.location.origin}/hook/${id}`);
-  }, [id]);
+  // Catch URL is the real deployment origin so it works out of the box. The
+  // server snapshot is empty so the first client render matches the server,
+  // then hydration fills in the real origin.
+  const origin = useSyncExternalStore(
+    noSubscribe,
+    () => window.location.origin,
+    () => "",
+  );
+  const catchUrl = origin ? `${origin}/hook/${id}` : "";
 
   // Responsive split.
   useEffect(() => {
